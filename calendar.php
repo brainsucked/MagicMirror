@@ -5,7 +5,10 @@
 	// $url = 'https://p24-calendars.icloud.com/holiday/US_en.ics';
 
 	/*****************************************/
-
+	
+	//$url = 'https://calendar.google.com/calendar/ical/bg.bulgarian%23holiday%40group.v.calendar.google.com/public/basic.ics';
+	$url = '';
+	
 	// Run the helper function with the desired URL and echo the contents.
 	echo get_url($url);
 

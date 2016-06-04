@@ -39,6 +39,18 @@ function roundVal(temp)
 	return Math.round( temp );
 }
 
+function kmh2beaufort(kmh)
+{
+	var speeds = [1, 5, 11, 19, 28, 38, 49, 61, 74, 88, 102, 117, 1000];
+	for (var beaufort in speeds) {
+		var speed = speeds[beaufort];
+		if (speed > kmh) {
+			return beaufort;
+		}
+	}
+	return 12;
+}
+
 // from http://stackoverflow.com/questions/5560248/programmatically-lighten-or-darken-a-hex-color-or-rgb-and-blend-colors
 function shadeColor2(color, percent) {   
     var f=parseInt(color.slice(1),16),t=percent<0?0:255,p=percent<0?percent*-1:percent,R=f>>16,G=f>>8&0x00FF,B=f&0x0000FF;
@@ -57,13 +69,6 @@ if( typeof feedURLs == 'undefined') {
 		var feedURLs = {"News" : feed};
 }
 
-// Test for other missing variables
-if( typeof clock12Hour == 'undefined')
-	var clock12Hour = true;
-
-if( typeof dayBeforeMonth == 'undefined')
-	var dayBeforeMonth = false;
-
 // Test for missing mixCompliments variable, setting it to true if missing
 if( typeof mixCompliments == 'undefined') {
 	var mixCompliments = true;
@@ -72,6 +77,7 @@ if( typeof mixCompliments == 'undefined') {
 jQuery(document).ready(function($) {
 
 	var news = [];								// Dictionary of arrays of news stories.  Outer arry indices match the feedURLs[] dictionary indices
+	var news_desc = [];							// Dictionary of arrays of news description stories.  Outer arry indices match the feedURLs[] dictionary indices
 	var newsFeedIndex  = 0;						// Index of the feed we're showing stories from in the news[] arary
 	var newsStoryIndex = 0;						// Index of the story we're showing in news[ newsFeedIndex ][]
 
@@ -122,81 +128,57 @@ jQuery(document).ready(function($) {
 			checkVersion();
 		}, 3000);
 	}
-//	checkVersion();
-
-	var timeMsg   = "";										// Declared outside of the function so that it persists
-	var timeColor = $('.time .warning').css('color');		// Same here
+	//	checkVersion();
 
 	(function updateTime()
 	{
-		moment.locale(lang, {						// Language localization
-			calendar : null
-		});
-
-		var now        = moment();
-        var date       = now.format( dayBeforeMonth ? 'dddd, D MMMM, YYYY' : 'dddd, MMMM Do, YYYY');
-		var foundMatch = false;
+		var now     = moment();
+        var date    = now.format('dddd, MMMM Do, YYYY');
+		var color   = $('.time .warning').css('color');
+		var message = "";
 
 		// See if the current time matches a warning time
-		if( now.seconds() < 2 ) {																	// We only do this for the first 2 seconds of the minute, since it's a waste of time otherwise
-			if( typeof warningTimes != 'undefined' ) {
-				for( var i=0; i < warningTimes.length; i++ ) {
-					// Check if the alert is valid for this day
-					if( typeof warningTimes[i].days != 'undefined' ) {
-						if( warningTimes[i].days[ now.day() ] == false )
-							continue;
-					}
+		if( typeof warningTimes != 'undefined' ) {
+			for( var i=0; i < warningTimes.length; i++ ) {
+				var startTime = moment( warningTimes[i].startTime, "H:mm" );
+				if( !startTime.isValid() )
+					continue;
 
-					// Make sure the current time lies between the start and end times
-					var startTime = moment( warningTimes[i].startTime, "H:mm" );
-					if( !startTime.isValid() )
-						continue;
+				var endTime   = moment( warningTimes[i].endTime,   "H:mm" );
+				if( !endTime.isValid() )
+					continue;
 
-					var endTime   = moment( warningTimes[i].endTime,   "H:mm" );
-					if( !endTime.isValid() )
-						continue;
+				if( endTime < startTime )
+					endTime.add( 1, "days" );
 
-					if( endTime < startTime )
-						endTime.add( 1, "days" );
-
-					if( (now.valueOf() > startTime.valueOf()) && (now.valueOf() < endTime.valueOf()) ) {
-						timeColor  = warningTimes[i].color;
-						timeMsg    = warningTimes[i].message;
-						foundMatch = true;
-					}
+				if( (now.valueOf() > startTime.valueOf()) && (now.valueOf() < endTime.valueOf()) ) {
+					color   = warningTimes[i].color;
+					message = warningTimes[i].message;
 				}
-			}
-
-			if( !foundMatch ) {
-				timeMsg   = "";
-				timeColor = $('.time .warning').css('color');
 			}
 		}
 
-		// Figure out 12 vs 24 hour time
-		var hoursMins = now.format( clock12Hour ? 'h:mm' : 'H:mm' );
-		var ampm      = clock12Hour ? now.format('a') : '&nbsp;';									// &nbsp; keeps the cell from becoming 0 height
+//		var isWarningTime = (now.hour() == 7) && (now.minute() >= 10) && (now.minute() < 20);		// Between 7:10 and 7:20 AM, turn the color read
 
-		// Draw the current time table
 		$('.date').html(date);
 		$('.time').html(																			// Ugly table here, but it gets the job done
 		    '<table>' +
 			    '<tr>' +
-				    '<td class="time" style="color:' + timeColor + '" ' +								// Apply the color
-					    'rowspan=4 cellpadding=0>' + hoursMins +'</td>' +							// Time cell is four rows tall
+				    '<td class="time" style="color:' + color + '" ' +								// Apply the color
+					    'rowspan=4 cellpadding=0>' + now.format('HH:mm') +'</td>' +					// Time cell is four rows tall
 					'<td> </td>' + 																	// Empty cell next to it
 				'</tr><tr>' +
 					'<td class="sec">'   + now.format('ss') + '</td>' +								// Seconds cell is pushed down a bit to line up with the top of the time
 				'<tr>' +
-					'<td class="am_pm">' + ampm  + '</td>' +										// AM/PM cell is pushed up a bit to line up with the bottom of the time
+					'<td class="am_pm">' + now.format('a')  + '</td>' +								// AM/PM cell is pushed up a bit to line up with the bottom of the time
 				'</tr><tr><td></td>' +
 				'</tr>' +
 			'</table>');
 
-		if( timeMsg == "" )
+		if( message == "" )
 			var timeWarning = "";
 		else
-			var timeWarning = '<div style="color:' + timeColor + '">&bull; ' + timeMsg + '</div>';
+			var timeWarning = '<div style="color:' + color + '">&bull; ' + message + '</div>';
 		$('.timeWarning').updateWithText( timeWarning, 1000 );
 
 		setTimeout(function() {
@@ -270,7 +252,9 @@ jQuery(document).ready(function($) {
                     var rule = new RRule(options);
                     
                     // TODO: don't use fixed end date here, use something like now() + 1 year
-                    var dates = rule.between(new Date(), new Date(2016,11,31), true, function (date, i){return i < 10});
+                    //var dates = rule.between(new Date(), new Date(2016,11,31), true, function (date, i){return i < 10});
+					var now = new Date();
+                    var dates = rule.between(now, new Date(now.getFullYear(), now.getMonth()+1, 31), true, function (date, i){return i < 10});
                     for (date in dates) {
                         var dt = new Date(dates[date]);
                         var days = moment(dt).diff(moment(), 'days');
@@ -337,7 +321,8 @@ jQuery(document).ready(function($) {
 		}
 
 		var now        = moment();
-		var holidayURL = 'http://holidayapi.com/v1/holidays?country=' + holidayCountry + '&year=';
+		//var holidayURL = 'http://holidayapi.com/v1/holidays?country=' + holidayCountry + '&year=';
+		var holidayURL = 'http://app.rifix.net/holidayapi/v1/holidays?country=' + holidayCountry + '&year=';
 
 		$.getJSON( holidayURL + now.format('YYYY'), function(jsonDate, textStatus) {
 			// Success; update the holiday string, even if it's just empty
@@ -405,13 +390,13 @@ jQuery(document).ready(function($) {
 				// Customize the locale for holidays
 				moment.locale(lang, {						// Language localization
 					calendar : {							// Calendar localization used for upcoming holidays.  Should really be localized too...
-						lastDay : '[Yesterday was] ' ,
-						sameDay : '[Today is] ',
-						nextDay : '[Tomorrow is] ',
-						thisWeek : 'dddd [is] ',
-						lastWeek : '[Last] dddd [was] ',
-						nextWeek : 'dddd [is] ',
-						sameElse : (dayBeforeMonth ? 'DD/MM'  : 'MM/DD') + ' [is] '
+						lastDay : '[Вчера беше] ' ,
+						sameDay : '[Днес е] ',
+						nextDay : '[Утре е] ',
+						thisWeek : 'dddd [е] ',
+						lastWeek : '[Миналата] dddd [беше] ',
+						nextWeek : 'dddd [е] ',
+						sameElse : 'DD.MM [е] '
 					}
 				});
 
@@ -509,7 +494,7 @@ jQuery(document).ready(function($) {
 					}
 
 					if( numAddedHere > 0 ) {
-						if( date.diff( now, 'days' ) == 0  )
+						if( date.month() == now.month() && date.day() == now.day() )
 							thisHolidayText += "!"
 
 						thisHolidayText += '</div>'
@@ -609,11 +594,15 @@ jQuery(document).ready(function($) {
 			if( jsonRSS.query.results != null ) {
 				// Success; get the list of articles
 				var stories = [];
-				for (var i in jsonRSS.query.results.item)
+				var stories_desc = [];
+				for (var i in jsonRSS.query.results.item) {
 					stories.push( jsonRSS.query.results.item[i].title );
-
+					stories_desc.push( jsonRSS.query.results.item[i].description );
+				}
+				
 				news[ index ] = stories;
-
+				news_desc[ index ] = stories_desc;
+				
 				// Update the "last updated" information with a count of all stories from all feeds
 				var newsCountTotal = 0;
 				for( var i=0; i < news.length; i++ ) {
@@ -699,13 +688,16 @@ jQuery(document).ready(function($) {
 
 		// Get the story text
 		var newsFeed = news[ newsFeedIndex ];
+		var newsDescFeed = news_desc[ newsFeedIndex ];
 		newsStory = newsFeed[ newsStoryIndex ];
+		newsDescStory = newsDescFeed[ newsStoryIndex ];
 
 		$('.news').updateWithText(newsStory,2000);
+		$('.news_desc').updateWithText(newsDescStory,2000);
 
 		// Set up for the next story
 		newsStoryIndex++;
-		setTimeout( showNews, 5500 + (newsStory.length * 20) );			// Length of the headline modifies how long it stays on screen
+		setTimeout( showNews, 10500 + (newsStory.length * 20) );			// Length of the headline modifies how long it stays on screen
 	})();
 
 });
