@@ -1,8 +1,8 @@
-#[iGlass] (http://app.rifix.net/iglass/)
+#[iGlass] (http://rifix.net/)
 
 iGlass е български вариант на MagicMirror
 
-![iGlass](http://app.rifix.net/iglass/Screenshot_2016-03-10-19-41-41.png)
+![iGlass](https://raw.githubusercontent.com/brainsucked/MagicMirror/master/screenshot.jpg)
 
 #Credits
 [jangellx/MagicMirror] (https://github.com/jangellx/MagicMirror)
